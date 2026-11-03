@@ -12,7 +12,9 @@
     "dev": "node --watch --env-file-if-exists=.env src/server.ts",
     "test": "node --test --disable-warning=ExperimentalWarning test/*.test.ts",
     "typecheck": "tsc --noEmit",
-    "check": "npm run typecheck && npm test"
+    "check": "npm run typecheck && npm test",
+    "demo": "node --disable-warning=ExperimentalWarning src/demo.ts",
+    "simulate": "node --disable-warning=ExperimentalWarning --env-file-if-exists=.env src/simulate.ts"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.6",

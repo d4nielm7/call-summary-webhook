@@ -4,6 +4,20 @@ import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import type { CallSummary } from "./schema.ts";
 
+export type Outcome = "created" | "duplicate" | "invalid" | "unauthorized";
+
+export interface DeliveryEvent {
+  id: number;
+  at: string;
+  outcome: Outcome;
+  matchedOn: "call_id" | "slot" | null;
+  /** The call this delivery created or matched. Null for deliveries that were refused. */
+  call: Pick<StoredCall, "callerName" | "reason" | "requestedTime"> | null;
+}
+
+/** How many delivery events to keep. Old ones are pruned on insert, so a flood can't grow the file forever. */
+const MAX_EVENTS = 20_000;
+
 export type SaveResult =
   | { created: true; id: string }
   | { created: false; id: string; matchedOn: "call_id" | "slot" };
@@ -55,6 +69,18 @@ export class CallStore {
         requested_time TEXT NOT NULL,
         received_at    TEXT NOT NULL
       ) STRICT;
+      CREATE INDEX IF NOT EXISTS calls_received_at ON calls (received_at);
+
+      -- One row per delivery attempt, whatever happened to it. Holds no caller data (that lives in
+      -- calls, reached through call_ref), which is what makes "duplicates blocked" countable.
+      CREATE TABLE IF NOT EXISTS events (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        at         TEXT NOT NULL,
+        outcome    TEXT NOT NULL CHECK (outcome IN ('created', 'duplicate', 'invalid', 'unauthorized')),
+        call_ref   TEXT,
+        matched_on TEXT
+      ) STRICT;
+      CREATE INDEX IF NOT EXISTS events_at ON events (at);
     `);
   }
 
@@ -63,7 +89,7 @@ export class CallStore {
    * (`ON CONFLICT DO NOTHING` against the UNIQUE constraints), so two identical requests
    * arriving at the same moment, even from different processes, cannot both be stored.
    */
-  save(call: CallSummary): SaveResult {
+  save(call: CallSummary, options: { at?: string } = {}): SaveResult {
     const id = randomUUID();
     const fingerprint = slotFingerprint(call);
     const { changes } = this.#db
@@ -72,7 +98,7 @@ export class CallStore {
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT DO NOTHING`,
       )
-      .run(id, call.callId, fingerprint, call.callerName, call.phone, call.reason, call.requestedTime, new Date().toISOString());
+      .run(id, call.callId, fingerprint, call.callerName, call.phone, call.reason, call.requestedTime, options.at ?? new Date().toISOString());
     if (changes === 1) return { created: true, id };
 
     if (call.callId !== null) {
@@ -86,17 +112,55 @@ export class CallStore {
     throw new Error("insert conflicted but no matching row was found");
   }
 
+  /** Logs what happened to one delivery. Can throw; the webhook handler catches it so bookkeeping can never fail a delivery. */
+  recordEvent(event: { outcome: Outcome; callRef?: string | null; matchedOn?: string | null; at?: string }): void {
+    this.#db
+      .prepare("INSERT INTO events (at, outcome, call_ref, matched_on) VALUES (?, ?, ?, ?)")
+      .run(event.at ?? new Date().toISOString(), event.outcome, event.callRef ?? null, event.matchedOn ?? null);
+    this.#db.exec(`DELETE FROM events WHERE id <= (SELECT MAX(id) FROM events) - ${MAX_EVENTS}`);
+  }
+
+  eventsSince(sinceIso: string, limit = 50_000): Array<{ at: string; outcome: Outcome }> {
+    return this.#db
+      .prepare("SELECT at, outcome FROM events WHERE at >= ? ORDER BY at DESC LIMIT ?")
+      .all(sinceIso, limit) as Array<{ at: string; outcome: Outcome }>;
+  }
+
+  callsSince(sinceIso: string, limit = 5000): StoredCall[] {
+    const rows = this.#db
+      .prepare("SELECT * FROM calls WHERE received_at >= ? ORDER BY received_at DESC, rowid DESC LIMIT ?")
+      .all(sinceIso, limit) as unknown as Row[];
+    return rows.map(toStoredCall);
+  }
+
+  recentEvents(limit: number): DeliveryEvent[] {
+    const rows = this.#db
+      .prepare(
+        `SELECT e.id, e.at, e.outcome, e.matched_on, c.caller_name, c.reason, c.requested_time
+         FROM events e LEFT JOIN calls c ON c.id = e.call_ref
+         ORDER BY e.id DESC LIMIT ?`,
+      )
+      .all(limit) as Array<{
+      id: number;
+      at: string;
+      outcome: Outcome;
+      matched_on: "call_id" | "slot" | null;
+      caller_name: string | null;
+      reason: string | null;
+      requested_time: string | null;
+    }>;
+    return rows.map((r) => ({
+      id: r.id,
+      at: r.at,
+      outcome: r.outcome,
+      matchedOn: r.matched_on,
+      call: r.caller_name === null ? null : { callerName: r.caller_name, reason: r.reason ?? "", requestedTime: r.requested_time ?? "" },
+    }));
+  }
+
   get(id: string): StoredCall | undefined {
     const row = this.#db.prepare("SELECT * FROM calls WHERE id = ?").get(id) as Row | undefined;
-    return row && {
-      id: row.id,
-      callId: row.call_id,
-      callerName: row.caller_name,
-      phone: row.phone,
-      reason: row.reason,
-      requestedTime: row.requested_time,
-      receivedAt: row.received_at,
-    };
+    return row && toStoredCall(row);
   }
 
   count(): number {
@@ -106,4 +170,16 @@ export class CallStore {
   close(): void {
     this.#db.close();
   }
+}
+
+function toStoredCall(row: Row): StoredCall {
+  return {
+    id: row.id,
+    callId: row.call_id,
+    callerName: row.caller_name,
+    phone: row.phone,
+    reason: row.reason,
+    requestedTime: row.requested_time,
+    receivedAt: row.received_at,
+  };
 }

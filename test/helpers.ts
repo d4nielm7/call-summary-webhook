@@ -13,7 +13,9 @@ export const validPayload = {
   requested_time: "2026-11-10T09:00:00-05:00",
 };
 
-export function setup(options: { maxBodyBytes?: number } = {}) {
+export const DASHBOARD_TOKEN = "dashboard-token-0123456789";
+
+export function setup(options: { maxBodyBytes?: number; dashboardToken?: string; demo?: boolean } = {}) {
   const store = new CallStore(":memory:");
   const app = createApp({ store, secret: SECRET, ...options });
 
