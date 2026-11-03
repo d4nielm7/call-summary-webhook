@@ -33,6 +33,15 @@ function main() {
     console.log(`  A simulated receptionist sends a call every few seconds. Ctrl+C to stop.\n`);
   });
 
+  server.on("error", (err: NodeJS.ErrnoException) => {
+    console.error(
+      err.code === "EADDRINUSE"
+        ? `\n  Port ${port} is already in use (another copy of the demo, or another app?).\n  Stop it, or use a different port:   PORT=${port + 1} npm run demo\n`
+        : err.message,
+    );
+    process.exit(1);
+  });
+
   let timer: NodeJS.Timeout | undefined;
   if (process.env.DEMO_LIVE !== "0") {
     const receptionist = new Simulator({ secret: SECRET, deliver: deliverTo(app) });

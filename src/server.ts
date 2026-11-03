@@ -22,6 +22,15 @@ const server = serve({ fetch: app.fetch, port }, (info) => {
   console.log(JSON.stringify({ event: "listening", port: info.port, dashboard: Boolean(dashboardToken) }));
 });
 
+server.on("error", (err: NodeJS.ErrnoException) => {
+  console.error(
+    err.code === "EADDRINUSE"
+      ? `Port ${port} is already in use. Stop the other program, or use a different port:  PORT=${port + 1} npm start`
+      : err.message,
+  );
+  process.exit(1);
+});
+
 function shutdown() {
   server.close(() => {
     store.close();
