@@ -114,7 +114,7 @@ export function createApp({
       if (!asset) return c.json({ status: "not_found" }, 404);
       c.header("Content-Type", asset.type);
       c.header("Cache-Control", path.startsWith("/fonts/") ? "public, max-age=86400" : "no-cache");
-      if (path === "/") {
+      if (asset.type.startsWith("text/html")) {
         c.header(
           "Content-Security-Policy",
           "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",

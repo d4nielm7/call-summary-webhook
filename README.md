@@ -18,7 +18,7 @@ A receptionist (or the built-in simulator) sends a signed call summary. The serv
 
 ![System in detail](docs/architecture.png)
 
-[`docs/architecture.html`](docs/architecture.html) is the full write-up (open it in a browser): the request path with every status code, the data model, how the dashboard gets its numbers, the security controls with the test that proves each one, and the trade-offs.
+**See it in the app:** run `npm run demo` and click **Architecture** in the sidebar (or open `/architecture`). The page has the same two diagrams plus the request path with every status code, the data model, how the dashboard gets its numbers, the security controls with the test that proves each one, and the trade-offs. Its source is [`public/architecture.html`](public/architecture.html).
 
 ## Run it
 
@@ -152,9 +152,9 @@ src/seed.ts        30 days of believable made-up history
 src/demo.ts        `npm run demo`
 src/simulate.ts    `npm run simulate`
 src/server.ts      entry point (env, startup, graceful shutdown)
-public/            the dashboard: index.html, dashboard.css, dashboard.js, Geist fonts (OFL)
-docs/              architecture diagram + write-up, dashboard screenshots
-test/              75 tests: schema, signing, dedupe (incl. concurrency + restart), dashboard maths
+public/            the website: dashboard (index.html, dashboard.js/css), architecture page, Geist fonts (OFL)
+docs/              README images: architecture diagrams, dashboard screenshots
+test/              77 tests: schema, signing, dedupe (incl. concurrency + restart), dashboard maths
                    (timezones, DST), API auth, demo endpoint, static-file safety, simulator
 ```
 

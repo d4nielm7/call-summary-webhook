@@ -1,161 +1,54 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html lang="en" data-theme="dark">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Call Desk Architecture</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<style>
-/* Layout idea: one long technical document. The system diagram opens it, each later section answers a question the diagram raises, the UI closes it. */
-:root {
-  --bg: #f3f4f8;
-  --surface: #ffffff;
-  --lane: #f2f4fa;
-  --ink: #101218;
-  --ink-2: #444b5a;
-  --ink-3: #5d6574;
-  --line: #d6dae4;
-  --accent: #2f5be0;
-  --ok: #1d7a44;
-  --bad: #b3372b;
-  --sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
-  color-scheme: light;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #0a0a0b; --surface: #121214; --lane: #18181b;
-    --ink: #f5f4f0; --ink-2: #c7c7cc; --ink-3: #9d9da3; --line: #2a2a2f;
-    --accent: #6a90ff; --ok: #4fd08f; --bad: #ff8576;
-    color-scheme: dark;
-  }
-}
-:root[data-theme="dark"] {
-  --bg: #0a0a0b; --surface: #121214; --lane: #18181b;
-  --ink: #f5f4f0; --ink-2: #c7c7cc; --ink-3: #9d9da3; --line: #2a2a2f;
-  --accent: #6a90ff; --ok: #4fd08f; --bad: #ff8576;
-  color-scheme: dark;
-}
-
-* { box-sizing: border-box; }
-html { background: var(--bg); }
-body { margin: 0; background: var(--bg); color: var(--ink); font: 400 16px/1.6 var(--sans); -webkit-font-smoothing: antialiased; }
-.wrap { max-width: 1240px; margin: 0 auto; padding: 0 20px 72px; }
-h1, h2, h3, p { margin: 0; text-wrap: balance; }
-p { text-wrap: pretty; }
-a { color: var(--accent); }
-code, pre { font-family: var(--mono); }
-:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
-
-header.top { padding: 56px 0 28px; display: grid; gap: 14px; max-width: 880px; }
-.eyebrow { font: 500 12px/1 var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-3); }
-h1 { font-size: clamp(2rem, 4.4vw, 3.1rem); line-height: 1.08; font-weight: 600; letter-spacing: -0.03em; }
-.lede { font-size: 1.12rem; color: var(--ink-2); max-width: 68ch; }
-
-.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 8px 0 8px; }
-.fact { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; display: grid; gap: 2px; }
-.fact b { font: 600 1.9rem/1.1 var(--sans); letter-spacing: -0.03em; }
-.fact span { color: var(--ink-3); font-size: 0.84rem; }
-
-section { padding-top: 56px; display: grid; gap: 18px; }
-section > .head { display: grid; gap: 8px; max-width: 76ch; }
-h2 { font-size: clamp(1.4rem, 2.6vw, 1.9rem); line-height: 1.15; font-weight: 600; letter-spacing: -0.02em; }
-.head p { color: var(--ink-2); }
-
-figure { margin: 0; display: grid; gap: 12px; }
-.fig { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 18px; overflow-x: auto; }
-.fig svg { display: block; width: 100%; height: auto; min-width: 900px; }
-figcaption { color: var(--ink-2); font-size: 0.95rem; max-width: 100ch; }
-figcaption b { color: var(--ink); font-weight: 600; }
-
-/* ---- SVG parts (classes live here: nothing styled inside the drawings) ---- */
-.proc { fill: var(--surface); stroke: var(--line); stroke-width: 1.5; }
-.lane { fill: var(--lane); stroke: var(--line); stroke-width: 1; }
-.box { fill: var(--surface); stroke: var(--line); stroke-width: 1.25; }
-.box.hot { stroke: var(--accent); stroke-width: 1.75; }
-.inner { fill: var(--lane); stroke: var(--line); stroke-width: 1; }
-.tag { font: 500 10.5px var(--mono); letter-spacing: 0.08em; fill: var(--ink-3); }
-.nm { font: 600 12.5px var(--mono); fill: var(--ink); }
-.ttl { font: 600 14px var(--sans); fill: var(--ink); }
-.ds { font: 400 11px var(--sans); fill: var(--ink-3); }
-.dm { font: 400 10.5px var(--mono); fill: var(--ink-3); }
-.lb { font: 400 11px var(--sans); fill: var(--ink-2); }
-.lm { font: 400 10.5px var(--mono); fill: var(--ink-2); }
-.flow { fill: none; stroke: var(--ink-3); stroke-width: 1.5; }
-.flow.hot { stroke: var(--accent); stroke-width: 2; }
-.h-m { fill: var(--ink-3); }
-.h-a { fill: var(--accent); }
-.pill { stroke-width: 1.25; }
-.pill.ok { fill: color-mix(in oklab, var(--ok) 13%, var(--surface)); stroke: var(--ok); }
-.pill.dup { fill: color-mix(in oklab, var(--accent) 12%, var(--surface)); stroke: var(--accent); }
-.pill.bad { fill: color-mix(in oklab, var(--bad) 11%, var(--surface)); stroke: var(--bad); }
-.code { font: 600 12px var(--mono); fill: var(--ink); }
-
-.ttl-l { font: 600 19px var(--sans); fill: var(--ink); }
-.sub-l { font: 400 13px var(--sans); fill: var(--ink-3); }
-.step { font: 500 14.5px var(--sans); fill: var(--ink); }
-.lbl-l { font: 400 12.5px var(--sans); fill: var(--ink-2); }
-.tag-l { font: 500 11.5px var(--mono); letter-spacing: 0.08em; fill: var(--ink-3); }
-.num-c { fill: var(--accent); }
-.num-t { font: 600 12px var(--sans); fill: var(--surface); }
-.chip-n { font: 600 13px var(--mono); fill: var(--ink); }
-.chip-d { font: 400 12px var(--sans); fill: var(--ink-3); }
-
-/* ---- cards, tables ---- */
-.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
-.card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 18px 20px; display: grid; gap: 10px; align-content: start; }
-.card h3 { font-size: 1rem; font-weight: 600; letter-spacing: -0.005em; }
-.card p { color: var(--ink-2); font-size: 0.93rem; }
-.proof { font: 400 12px/1.5 var(--mono); color: var(--ink-3); border-top: 1px solid var(--line); padding-top: 10px; }
-.proof b { font-weight: 500; color: var(--ink-2); }
-
-.cols { display: grid; gap: 0; font-size: 0.88rem; }
-.cols .r { display: grid; grid-template-columns: minmax(120px, 1.1fr) minmax(90px, 1fr) minmax(90px, 1.2fr); gap: 12px; padding: 7px 0; border-top: 1px solid var(--line); align-items: baseline; }
-.cols .r:first-child { border-top: 0; }
-.cols .n { font-family: var(--mono); font-weight: 500; }
-.cols .t { color: var(--ink-3); font-family: var(--mono); font-size: 0.8rem; }
-.badge { display: inline-block; font: 500 11px/1 var(--mono); padding: 3px 7px; border-radius: 999px; border: 1px solid var(--line); color: var(--ink-2); white-space: nowrap; }
-.badge.key { border-color: var(--accent); color: var(--accent); }
-.badge.uq { border-color: var(--ok); color: var(--ok); }
-.pre { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px 18px; font-size: 0.86rem; overflow-x: auto; white-space: pre; color: var(--ink-2); line-height: 1.7; }
-.pre b { color: var(--ink); font-weight: 500; }
-
-.tbl { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; }
-table { border-collapse: collapse; width: 100%; font-size: 0.92rem; min-width: 760px; }
-th { text-align: left; font: 500 11.5px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); padding: 12px 18px; border-bottom: 1px solid var(--line); white-space: nowrap; }
-td { padding: 13px 18px; border-top: 1px solid var(--line); vertical-align: top; color: var(--ink-2); }
-tbody tr:first-child td { border-top: 0; }
-td:first-child { color: var(--ink); font-weight: 500; }
-td code { font-size: 0.82rem; color: var(--ink); }
-
-.shots { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 16px; align-items: start; }
-.shot { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 10px; display: grid; gap: 8px; }
-.shot img { display: block; width: 100%; height: auto; border-radius: 10px; }
-.shot span { color: var(--ink-3); font-size: 0.84rem; padding: 0 4px 2px; }
-
-.run { background: var(--surface); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 14px; padding: 18px 22px; display: grid; gap: 8px; }
-.run code { font-size: 0.95rem; color: var(--ink); }
-
-@media (max-width: 860px) { .shots { grid-template-columns: 1fr; } header.top { padding-top: 36px; } section { padding-top: 44px; } }
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Call Desk · Architecture</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preload" href="/fonts/geist.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/dashboard.css">
+  <script src="/architecture.js" defer></script>
 </head>
 <body>
-<div class="wrap">
+  <div class="backdrop" aria-hidden="true"></div>
+  <div class="app">
+    <aside class="rail">
+      <a class="brand" href="/" aria-label="Call Desk dashboard"><span class="brand-dot"></span><span class="brand-name">Call Desk</span></a>
+      <p class="rail-sub">Architecture</p>
+      <nav class="nav" aria-label="Sections">
+        <a href="/" class="nav-link">← Back to dashboard</a>
+        <span class="nav-label">On this page</span>
+        <a href="#overview" class="nav-link is-active">Overview</a>
+        <a href="#system" class="nav-link">In detail</a>
+        <a href="#path" class="nav-link">Request path</a>
+        <a href="#data" class="nav-link">Data</a>
+        <a href="#flow" class="nav-link">Dashboard data</a>
+        <a href="#security" class="nav-link">Security</a>
+        <a href="#decisions" class="nav-link">Decisions</a>
+      </nav>
+      <div class="rail-foot">
+        <div class="rail-actions">
+          <button class="icon-btn" id="theme" type="button" aria-label="Switch between dark and light theme" title="Theme"></button>
+        </div>
+      </div>
+    </aside>
 
-<header class="top">
-  <span class="eyebrow">Call Desk · architecture</span>
-  <h1>One small server that stores every call exactly once</h1>
-  <p class="lede">An AI receptionist sends a summary of each call as a webhook. The server checks that the message is genuine, checks the data, refuses repeats, stores the call, and shows what happened on a live dashboard.</p>
-  <div class="facts" aria-label="Size of the system">
-    <div class="fact"><b>1</b><span>Node process</span></div>
-    <div class="fact"><b>1</b><span>SQLite file</span></div>
-    <div class="fact"><b>3</b><span>runtime dependencies</span></div>
-    <div class="fact"><b>0</b><span>outside services</span></div>
-    <div class="fact"><b>75</b><span>automated tests</span></div>
-  </div>
-</header>
+    <main class="main doc" id="main">
+      <header class="top">
+        <div>
+          <h1>Architecture</h1>
+          <p class="muted">How one small server receives, checks, de-duplicates and stores every call</p>
+        </div>
+      </header>
+
+      <div class="facts" aria-label="Size of the system">
+        <div class="card fact"><b>1</b><span>Node process</span></div>
+        <div class="card fact"><b>1</b><span>SQLite file</span></div>
+        <div class="card fact"><b>3</b><span>runtime dependencies</span></div>
+        <div class="card fact"><b>0</b><span>outside services</span></div>
+        <div class="card fact"><b>77</b><span>automated tests</span></div>
+      </div>
 
 <!-- 0 · OVERVIEW -->
 <section id="overview">
@@ -283,7 +176,7 @@ td code { font-size: 0.82rem; color: var(--ink); }
         <text class="ds" x="384" y="418">counts per clinic day · totals · live feed · requested times</text>
         <rect class="box" x="368" y="452" width="484" height="64" rx="10"/>
         <text class="nm" x="384" y="478">assets.ts</text>
-        <text class="ds" x="384" y="498">serves five allow-listed files; the page itself holds no data</text>
+        <text class="ds" x="384" y="498">serves only allow-listed files; the page holds no data</text>
 
         <!-- callers -->
         <rect class="box" x="20" y="62" width="180" height="70" rx="12"/>
@@ -401,24 +294,24 @@ td code { font-size: 0.82rem; color: var(--ink); }
 
         <!-- refusals -->
         <line class="flow" x1="100" y1="128" x2="100" y2="166" marker-end="url(#p-m)"/>
-        <rect class="pill bad" x="48" y="168" width="104" height="44" rx="10"/>
+        <rect class="out bad" x="48" y="168" width="104" height="44" rx="10"/>
         <text class="code" x="100" y="187" text-anchor="middle">401</text><text class="ds" x="100" y="203" text-anchor="middle">unauthorized</text>
         <line class="flow" x1="296" y1="128" x2="296" y2="166" marker-end="url(#p-m)"/>
-        <rect class="pill bad" x="244" y="168" width="104" height="44" rx="10"/>
+        <rect class="out bad" x="244" y="168" width="104" height="44" rx="10"/>
         <text class="code" x="296" y="187" text-anchor="middle">413</text><text class="ds" x="296" y="203" text-anchor="middle">too large</text>
         <line class="flow" x1="492" y1="128" x2="492" y2="166" marker-end="url(#p-m)"/>
-        <rect class="pill bad" x="440" y="168" width="104" height="44" rx="10"/>
+        <rect class="out bad" x="440" y="168" width="104" height="44" rx="10"/>
         <text class="code" x="492" y="187" text-anchor="middle">400</text><text class="ds" x="492" y="203" text-anchor="middle">invalid JSON</text>
         <line class="flow" x1="688" y1="128" x2="688" y2="166" marker-end="url(#p-m)"/>
-        <rect class="pill bad" x="636" y="168" width="104" height="44" rx="10"/>
+        <rect class="out bad" x="636" y="168" width="104" height="44" rx="10"/>
         <text class="code" x="688" y="187" text-anchor="middle">422</text><text class="ds" x="688" y="203" text-anchor="middle">fields listed</text>
 
         <!-- outcomes of the store step -->
         <line class="flow hot" x1="844" y1="128" x2="844" y2="166" marker-end="url(#p-a)"/>
-        <rect class="pill ok" x="806" y="168" width="76" height="44" rx="10"/>
+        <rect class="out ok" x="806" y="168" width="76" height="44" rx="10"/>
         <text class="code" x="844" y="187" text-anchor="middle">201</text><text class="ds" x="844" y="203" text-anchor="middle">created</text>
         <line class="flow hot" x1="924" y1="128" x2="924" y2="166" marker-end="url(#p-a)"/>
-        <rect class="pill dup" x="886" y="168" width="76" height="44" rx="10"/>
+        <rect class="out dup" x="886" y="168" width="76" height="44" rx="10"/>
         <text class="code" x="924" y="187" text-anchor="middle">200</text><text class="ds" x="924" y="203" text-anchor="middle">duplicate</text>
 
         <text class="ds" x="1000" y="158">Every outcome is logged,</text>
@@ -469,7 +362,7 @@ td code { font-size: 0.82rem; color: var(--ink); }
 INSERT INTO calls (...) VALUES (...)
 <b>ON CONFLICT DO NOTHING</b>        -- call_id or fingerprint already present? then nothing is written
 -- changes = 1  → 201 created      changes = 0  → look up the existing row → 200 duplicate</pre>
-  <p class="lede" style="font-size:0.97rem">The caller's name and the reason are left out of the fingerprint on purpose. Speech-to-text spells the same person differently ("Jon", "John") and a language model never words a summary the same way twice, so including them would let real repeats through.</p>
+  <p class="note">The caller's name and the reason are left out of the fingerprint on purpose. Speech-to-text spells the same person differently ("Jon", "John") and a language model never words a summary the same way twice, so including them would let real repeats through.</p>
 </section>
 
 <!-- 4 · DASHBOARD DATA FLOW -->
@@ -524,7 +417,7 @@ INSERT INTO calls (...) VALUES (...)
     <div class="card"><h3>Two calls at once</h3><p>The database's unique keys decide, in the same statement that writes. There is no gap between checking and saving for a second call to slip through.</p><div class="proof"><b>test</b> only one of many simultaneous identical deliveries is stored</div></div>
     <div class="card"><h3>Who may read the dashboard</h3><p>The page and its files hold no data. The data endpoint needs a bearer token, hashed and compared in constant time. With no token configured it answers 404.</p><div class="proof"><b>test</b> 401s a missing or wrong token</div></div>
     <div class="card"><h3>What the browser may run</h3><p>Caller text is only ever put on the page as plain text, never as markup, and a strict Content-Security-Policy blocks inline scripts and framing.</p><div class="proof"><b>tests</b> never builds markup from strings · serves the page with a locked-down content security policy</div></div>
-    <div class="card"><h3>Which files are served</h3><p>Only five named paths are served. A request path is never turned into a file read, so nothing else in the project is reachable.</p><div class="proof"><b>test</b> serves nothing outside the allowlist, whatever the path</div></div>
+    <div class="card"><h3>Which files are served</h3><p>Only a short list of named paths is served. A request path is never turned into a file read, so nothing else in the project is reachable.</p><div class="proof"><b>test</b> serves nothing outside the allowlist, whatever the path</div></div>
     <div class="card"><h3>The demo controls</h3><p>The route that makes up fake calls exists only when demo mode is on. On a real server it answers 404, even with a valid token.</p><div class="proof"><b>test</b> does not exist unless demo mode is on</div></div>
     <div class="card"><h3>What the logs hold</h3><p>One line per request with the outcome, an id and the names of failed fields. Never a name, a number or a reason.</p><div class="proof"><b>test</b> never logs caller data</div></div>
   </div>
@@ -536,8 +429,7 @@ INSERT INTO calls (...) VALUES (...)
     <span class="eyebrow">6 · Decisions</span>
     <h2>The choices that were made, and what each one costs</h2>
   </div>
-  <div class="tbl">
-    <table>
+  <div class="card"><div class="table-wrap"><table class="table">
       <thead><tr><th>Decision</th><th>Why</th><th>Cost, and what changes at scale</th></tr></thead>
       <tbody>
         <tr><td>SQLite in one file</td><td>Real storage that can enforce uniqueness, with nothing to install. A reviewer runs it in one command.</td><td>Needs a persistent disk. On serverless hosting, swap <code>CallStore</code> for Postgres and keep the same two UNIQUE keys; nothing else changes.</td></tr>
@@ -548,42 +440,12 @@ INSERT INTO calls (...) VALUES (...)
         <tr><td>Numbers added up in JavaScript</td><td>Simple and correct at appointment-inbox volume (thousands of rows).</td><td>At much larger volume, move the GROUP BY into SQL.</td></tr>
         <tr><td>A separate events table</td><td>Makes blocked and refused deliveries countable without storing personal data twice.</td><td>One extra write per delivery. A failure to log is caught and never fails the call.</td></tr>
       </tbody>
-    </table>
-  </div>
+    </table></div></div>
 </section>
 
-<!-- 7 · UI -->
-<section id="ui">
-  <div class="head">
-    <span class="eyebrow">7 · The interface</span>
-    <h2>The dashboard, and where each panel gets its numbers</h2>
-    <p>Every panel is drawn from the same snapshot. One date filter (7, 14 or 30 days) scopes all of them. Each chart has a "View as table" twin, and there is a dark and a light theme.</p>
-  </div>
-  <div class="shots">
-    <div class="shot"><img src="dashboard-dark.png" width="1440" height="2119" alt="The dashboard in its dark theme: a headline figure, four stat tiles, a calls-over-time chart, an outcome bar, a requested-time heatmap, a live activity feed and a table of recent calls."><span>Dark theme, with the demo's made-up data.</span></div>
-    <div class="shot"><img src="dashboard-light.png" width="1440" height="1180" alt="The top of the dashboard in its light theme, showing the headline figure, the demo buttons and the four stat tiles."><span>Light theme.</span></div>
-  </div>
-  <div class="tbl">
-    <table>
-      <thead><tr><th>Panel</th><th>What it shows</th><th>Comes from</th><th>Form</th></tr></thead>
-      <tbody>
-        <tr><td>Calls captured</td><td>Calls stored in the chosen range</td><td><code>totals.stored</code></td><td>One large figure</td></tr>
-        <tr><td>Four stat tiles</td><td>Last 24 hours, duplicates blocked, invalid, bad signatures</td><td><code>totals</code>, <code>daily[]</code></td><td>Stat tile with a sparkline</td></tr>
-        <tr><td>Calls over time</td><td>Stored against duplicates blocked, per clinic day</td><td><code>daily[]</code></td><td>Line and area, hover readout</td></tr>
-        <tr><td>Where deliveries ended up</td><td>How every delivery split into four outcomes</td><td><code>totals</code></td><td>One segmented bar</td></tr>
-        <tr><td>When callers want to come in</td><td>Requested appointments by weekday and hour</td><td><code>requested_times[]</code></td><td>Heatmap, clinic time</td></tr>
-        <tr><td>Live activity</td><td>The latest 30 deliveries, newest first</td><td><code>feed[]</code></td><td>Feed with outcome labels</td></tr>
-        <tr><td>Recent calls</td><td>Searchable table, phone numbers masked until revealed</td><td><code>calls[]</code></td><td>Table</td></tr>
-      </tbody>
-    </table>
-  </div>
-  <div class="run">
-    <span class="eyebrow">Run it</span>
-    <code>npm install &amp;&amp; npm run demo</code>
-    <p style="color:var(--ink-2);font-size:0.95rem">Opens the dashboard with 30 days of made-up history, and a simulated receptionist sends a call every few seconds. All names and numbers are fictional.</p>
-  </div>
-</section>
 
-</div>
+      <footer class="foot muted small">Every name and number in the demo is fictional sample data.</footer>
+    </main>
+  </div>
 </body>
 </html>

@@ -233,9 +233,29 @@ describe("dashboard page and assets", () => {
     }
   });
 
+  it("serves the architecture page, with the same strict policy and no inline script to block", async () => {
+    const { app } = setup();
+    const res = await app.request("/architecture");
+    assert.equal(res.status, 200);
+    assert.match(res.headers.get("content-type") ?? "", /text\/html/);
+    assert.match(res.headers.get("content-security-policy") ?? "", /script-src 'self'(;|$)/);
+    const html = await res.text();
+    assert.match(html, /<svg[^>]*role="img"/, "expected the diagrams");
+    assert.match(html, /id="overview"/);
+    assert.doesNotMatch(html, /<script(?![^>]*\bsrc=)/, "an inline script would be blocked by the policy");
+    assert.doesNotMatch(html, /\son[a-z]+=/i, "inline event handlers would be blocked by the policy");
+    assert.equal((await app.request("/architecture.js")).status, 200);
+  });
+
+  it("links the two pages to each other", async () => {
+    const { app } = setup();
+    assert.match(await (await app.request("/")).text(), /href="\/architecture"/);
+    assert.match(await (await app.request("/architecture")).text(), /href="\/"/);
+  });
+
   it("serves nothing outside the allowlist, whatever the path", async () => {
     const { app } = setup();
-    for (const path of ["/package.json", "/.env", "/../package.json", "/fonts/../package.json", "/src/store.ts", "/data/calls.db", "/fonts/geist-latin.woff2", "/public/index.html"]) {
+    for (const path of ["/package.json", "/.env", "/../package.json", "/fonts/../package.json", "/src/store.ts", "/data/calls.db", "/fonts/geist-latin.woff2", "/public/index.html", "/architecture.html", "/architecture/", "/public/architecture.html"]) {
       assert.equal((await app.request(path)).status, 404, path);
     }
   });
@@ -243,11 +263,13 @@ describe("dashboard page and assets", () => {
 
 describe("dashboard script", () => {
   it("never builds markup from strings, so caller-supplied text can't become HTML", () => {
-    const source = readFileSync(new URL("../public/dashboard.js", import.meta.url), "utf8")
-      .replace(/\/\*[\s\S]*?\*\//g, "") // the header comment mentions innerHTML in order to forbid it
-      .replace(/^\s*\/\/.*$/gm, "");
-    for (const banned of ["innerHTML", "outerHTML", "insertAdjacentHTML", "document.write", "eval(", "new Function"]) {
-      assert.ok(!source.includes(banned), `dashboard.js must not use ${banned}`);
+    for (const file of ["dashboard.js", "architecture.js"]) {
+      const source = readFileSync(new URL(`../public/${file}`, import.meta.url), "utf8")
+        .replace(/\/\*[\s\S]*?\*\//g, "") // the header comment mentions innerHTML in order to forbid it
+        .replace(/^\s*\/\/.*$/gm, "");
+      for (const banned of ["innerHTML", "outerHTML", "insertAdjacentHTML", "document.write", "eval(", "new Function"]) {
+        assert.ok(!source.includes(banned), `${file} must not use ${banned}`);
+      }
     }
   });
 });

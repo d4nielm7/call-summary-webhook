@@ -8,6 +8,8 @@ const ROOT = new URL("../public/", import.meta.url);
 
 const ASSETS: Record<string, { file: string; type: string }> = {
   "/": { file: "index.html", type: "text/html; charset=utf-8" },
+  "/architecture": { file: "architecture.html", type: "text/html; charset=utf-8" },
+  "/architecture.js": { file: "architecture.js", type: "text/javascript; charset=utf-8" },
   "/dashboard.css": { file: "dashboard.css", type: "text/css; charset=utf-8" },
   "/dashboard.js": { file: "dashboard.js", type: "text/javascript; charset=utf-8" },
   "/favicon.svg": { file: "favicon.svg", type: "image/svg+xml" },
