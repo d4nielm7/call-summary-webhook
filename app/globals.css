@@ -32,6 +32,7 @@ code, pre, .mono { font-family: var(--mono); }
 
 .page { display: grid; grid-template-columns: minmax(0, 1fr); gap: 40px; max-width: 980px; margin: 0 auto; padding: 56px 20px 96px; }
 .notice { padding: 16px 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
+.notice.warn { border-color: color-mix(in oklch, var(--caught) 65%, transparent); }
 
 .n {
   display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%;

@@ -27,7 +27,11 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  shared.callStore?.close();
+  try {
+    shared.callStore?.close();
+  } catch {
+    // A test may already have closed it.
+  }
   delete shared.callStore;
   delete shared.simulator;
   vi.unstubAllEnvs();
@@ -103,6 +107,31 @@ describe("demo routes", () => {
     configure({ DEMO_MODE: "1", WEBHOOK_SECRET: "" });
     const { GET } = await import("@/app/api/demo/calls/route");
     expect(await (await GET(demoCalls())).json()).toEqual({ total: 0, calls: [] });
+  });
+
+  it("answer a plain 500, not a crash, when the store is broken", async () => {
+    configure({ DEMO_MODE: "1", WEBHOOK_SECRET: "" });
+    const send = await import("@/app/api/demo/send/route");
+    const calls = await import("@/app/api/demo/calls/route");
+
+    await send.POST(demoSend("call"));
+    shared.callStore?.close();
+
+    const list = await calls.GET(demoCalls());
+    expect(list.status).toBe(500);
+    expect(await list.json()).toEqual({ status: "error" });
+  });
+
+  it("show the webhook's own 500 when sending into a broken store", async () => {
+    configure({ DEMO_MODE: "1", WEBHOOK_SECRET: "" });
+    const send = await import("@/app/api/demo/send/route");
+
+    await send.POST(demoSend("call"));
+    shared.callStore?.close();
+
+    const response = await send.POST(demoSend("call"));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ response: { status: 500, body: { status: "error" } } });
   });
 
   it("can be cleared", async () => {

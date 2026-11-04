@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import type { DeliveryKind } from "@/lib/demo/simulator";
-import { describeFlow, type FlowResult } from "@/lib/flow";
-import type { DemoCall } from "@/lib/handlers/demo";
+import { describeFlow } from "@/lib/flow";
+import { clearStored, loadStored, sendCall, type Outcome, type Stored } from "./demo-api";
 import { ExchangePanels, type Exchange } from "./exchange";
 import { Pipeline } from "./pipeline";
 import { StoredCalls } from "./stored-calls";
@@ -17,30 +17,28 @@ const ACTIONS: Array<{ kind: DeliveryKind; label: string; hint: string; primary?
 
 const POLL_MS = 3000;
 
-interface SendResponse {
-  request: { signature: string; body: string };
-  response: { status: number; body: FlowResult["body"] };
-}
-
 export function FlowDemo() {
   const [exchange, setExchange] = useState<Exchange | null>(null);
   const [busy, setBusy] = useState<DeliveryKind | null>(null);
-  const [stored, setStored] = useState<{ total: number; calls: DemoCall[] } | null>(null);
+  const [stored, setStored] = useState<Stored | null>(null);
   const [off, setOff] = useState(false);
+  const [broken, setBroken] = useState(false);
   const [reload, setReload] = useState(0);
+
+  function note(outcome: Outcome<unknown>) {
+    if (outcome.ok) return setBroken(false);
+    if (outcome.reason === "off") return setOff(true);
+    setBroken(true);
+  }
 
   useEffect(() => {
     let active = true;
 
     async function load() {
-      try {
-        const response = await fetch("/api/demo/calls", { cache: "no-store" });
-        if (!active) return;
-        if (response.status === 404) return setOff(true);
-        setStored(await response.json());
-      } catch {
-        // The next poll tries again.
-      }
+      const outcome = await loadStored();
+      if (!active) return;
+      note(outcome);
+      if (outcome.ok) setStored(outcome.value);
     }
 
     load();
@@ -53,19 +51,17 @@ export function FlowDemo() {
 
   async function send(kind: DeliveryKind) {
     setBusy(kind);
-    try {
-      const response = await fetch(`/api/demo/send?kind=${kind}`, { method: "POST" });
-      if (response.status === 404) return setOff(true);
-      const sent = (await response.json()) as SendResponse;
-      setExchange({ ...sent.request, status: sent.response.status, answer: sent.response.body });
+    const outcome = await sendCall(kind);
+    setBusy(null);
+    note(outcome);
+    if (outcome.ok) {
+      setExchange(outcome.value);
       setReload((n) => n + 1);
-    } finally {
-      setBusy(null);
     }
   }
 
   async function clear() {
-    await fetch("/api/demo/calls", { method: "DELETE" });
+    note(await clearStored());
     setReload((n) => n + 1);
   }
 
@@ -80,6 +76,12 @@ export function FlowDemo() {
           duplicates and stores it. Press a button to play the receptionist. All names and numbers are made up.
         </p>
       </header>
+
+      {broken && (
+        <p className="notice warn">
+          The server answered with an error. Check the terminal where it is running. If you just changed the code, stop it and start it again.
+        </p>
+      )}
 
       {off ? (
         <p className="notice">
