@@ -8,6 +8,14 @@ TypeScript · [Hono](https://hono.dev) · [zod](https://zod.dev) · SQLite (Node
 
 > All data in this repo (tests, examples, the demo) is fictional: invented names and phone numbers from the 555-01xx block reserved for fiction. Nothing here uses real people or real patient information.
 
+## Architecture
+
+![System architecture](docs/architecture.png)
+
+One Node process and one SQLite file. A signed call passes `signature.ts` → `schema.ts` → `store.ts` and lands in the `calls` table, where two `UNIQUE` keys decide what counts as a duplicate. The dashboard is a static page plus one token-protected JSON endpoint reading the same file. The blue path is the brief (receive, validate, de-duplicate, store); the grey paths support the dashboard and the demo.
+
+[`docs/architecture.html`](docs/architecture.html) is the full write-up (open it in a browser): the request path with every status code, the data model, how the dashboard gets its numbers, the security controls with the test that proves each one, and the trade-offs.
+
 ## Run it
 
 Requires Node **22.18+**.
@@ -141,6 +149,7 @@ src/demo.ts        `npm run demo`
 src/simulate.ts    `npm run simulate`
 src/server.ts      entry point (env, startup, graceful shutdown)
 public/            the dashboard: index.html, dashboard.css, dashboard.js, Geist fonts (OFL)
+docs/              architecture diagram + write-up, dashboard screenshots
 test/              75 tests: schema, signing, dedupe (incl. concurrency + restart), dashboard maths
                    (timezones, DST), API auth, demo endpoint, static-file safety, simulator
 ```
