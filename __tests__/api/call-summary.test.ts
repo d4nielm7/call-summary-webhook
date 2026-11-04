@@ -248,48 +248,9 @@ describe("failures on our side", () => {
     expect(response.status).toBe(500);
     expect(await response.json()).toEqual({ status: "error" });
   });
-
-  it("keeps a delivery's 2xx even if event bookkeeping fails", async () => {
-    const { post, store } = setup();
-    store.recordEvent = () => {
-      throw new Error("disk full");
-    };
-    const res = await post(validPayload);
-    expect(res.status).toBe(201);
-    expect(store.count()).toBe(1);
-  });
 });
 
-describe("events and logging", () => {
-  it("records one event per delivery, whatever happened to it", async () => {
-    const { post, store } = setup();
-    await post(validPayload);
-    await post(validPayload);
-    await post({ ...validPayload, phone: "nope" });
-    await post("{not json");
-    await post(validPayload, { signature: "sha256=00" });
-
-    expect(store.recentEvents(10).map((e) => e.outcome)).toEqual(["unauthorized", "invalid", "invalid", "duplicate", "created"]);
-  });
-
-  it("links created and duplicate events to the call, and refused ones to nothing", async () => {
-    const { post, store } = setup();
-    await post(validPayload);
-    await post(validPayload);
-    await post({ ...validPayload, reason: "" });
-
-    const [refused, duplicate, created] = store.recentEvents(3);
-    expect(refused?.call).toBeNull();
-    expect(duplicate).toMatchObject({ matchedOn: "call_id", call: { callerName: "Jane Sample" } });
-    expect(created?.call?.callerName).toBe("Jane Sample");
-  });
-
-  it("does not record an event for an oversized body", async () => {
-    const { post, store } = setup({ maxBodyBytes: 100 });
-    await post({ ...validPayload, reason: "x".repeat(500) });
-    expect(store.recentEvents(10)).toEqual([]);
-  });
-
+describe("logging", () => {
   it("never logs caller data", async () => {
     const log = vi.fn();
     const { post } = setup({ log });

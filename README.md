@@ -1,10 +1,8 @@
 # Call summary webhook
 
-An endpoint that receives the summary an AI receptionist sends after a call (caller name, phone, reason for calling, requested time), validates it, drops duplicates and stores it in SQLite. Next.js (App Router) and TypeScript.
+An endpoint that receives the summary an AI receptionist sends after a call (caller name, phone, reason for calling, requested time), checks it, drops duplicates and stores it in SQLite. Next.js (App Router) and TypeScript.
 
-It also has a small dashboard and an architecture page, so the data can be looked at. Everything in the demo is made-up sample data.
-
-![Dashboard](docs/dashboard-dark.png)
+![The demo page](docs/flow.png)
 
 ## Run it
 
@@ -15,21 +13,21 @@ npm install
 npm run demo
 ```
 
-Open the Local URL it prints. There is no login in demo mode. It seeds 30 days of fictional history and keeps sending new calls while you watch. The buttons on the dashboard send a call, a duplicate, a bad payload or a forged one through the real endpoint.
+Open the Local URL it prints. The page plays the receptionist: each button sends a signed request to the real endpoint and shows the request, the answer and which check stopped it. The list at the bottom is what is actually in the database, and it starts empty. A request sent from a terminal shows up there too. All names and numbers are made up.
 
-To run it for real:
+To run only the endpoint:
 
 ```sh
-cp .env.example .env.local   # set WEBHOOK_SECRET, and DASHBOARD_TOKEN if you want the dashboard
+cp .env.example .env.local   # set WEBHOOK_SECRET
 npm run dev
 ```
 
+The demo page and its `/api/demo/*` routes exist only when `DEMO_MODE=1` (that is what `npm run demo` sets). Without it, the server has the webhook and nothing that reads stored calls back.
+
 | Variable | |
 | --- | --- |
-| `WEBHOOK_SECRET` | Required, 16+ characters. Used to sign request bodies. |
-| `DASHBOARD_TOKEN` | Turns on the dashboard and its data endpoint outside demo mode, 16+ characters. Off when empty. |
-| `DASHBOARD_TZ` | Timezone the dashboard counts days in. Default `America/New_York`. |
-| `DATABASE_PATH` | SQLite file. Default `./data/calls.db`. |
+| `WEBHOOK_SECRET` | Required, 16+ characters. Used to sign request bodies. Demo mode has its own. |
+| `DATABASE_PATH` | SQLite file. Default `./data/calls.db`, or `./data/demo.db` in demo mode. |
 
 ## The endpoint
 
@@ -44,6 +42,8 @@ SIG="sha256=$(printf '%s' "$BODY" | openssl dgst -sha256 -hmac "$WEBHOOK_SECRET"
 curl -i -X POST http://localhost:3000/api/webhooks/call-summary \
   -H "content-type: application/json" -H "x-webhook-signature: $SIG" -d "$BODY"
 ```
+
+In demo mode the secret is `demo-webhook-secret-0123456789`.
 
 | Field | Rules |
 | --- | --- |
@@ -73,14 +73,6 @@ A call is a duplicate if it has the same `call_id`, or the same phone number ask
 
 The check and the insert are one statement (`INSERT ... ON CONFLICT DO NOTHING` against two `UNIQUE` columns), so two identical requests arriving together can't both be stored. There is a test that fires 20 at once.
 
-## Dashboard
-
-`/` shows counts per day, duplicates blocked, a live feed, requested appointment times and a searchable table. In demo mode it opens straight away. On a real server it needs `DASHBOARD_TOKEN` and asks for it on first load, because it lists caller names and numbers. Phone numbers are masked until you switch them on.
-
-`/architecture` explains how it fits together:
-
-![Architecture](docs/architecture-overview.png)
-
 ## Tests
 
 ```sh
@@ -88,23 +80,20 @@ npm test         # vitest
 npm run check    # lint, typecheck and tests
 ```
 
-Over 350 tests: validation edge cases, the handler with every status code, concurrent duplicates, restart persistence, dashboard counting across daylight-saving changes, config, the CSP, the simulator, and server-rendered components.
+About 230 tests: validation edge cases, the handler with every status code, concurrent duplicates, restart persistence, request size limits, config, the simulator, the route wiring and the demo page.
 
 ## Layout
 
 ```
 app/
   api/webhooks/call-summary/   the endpoint
-  api/dashboard/               dashboard data, behind the token
-  api/demo/simulate/           demo mode only
-  architecture/                architecture page
-  page.tsx                     dashboard
+  api/demo/                    demo only: send a made-up call, list and clear what is stored
+  page.tsx                     the demo page
 lib/
   handlers/                    request logic, plain Request in and Response out
-  schema.ts  signature.ts  store.ts  dashboard.ts  config.ts
-  demo/                        simulated receptionist and seed data
-components/dashboard/          dashboard UI
-proxy.ts                       per-request Content-Security-Policy
+  schema.ts  signature.ts  store.ts  config.ts  flow.ts
+  demo/                        the simulated receptionist
+components/                    the demo page
 __tests__/
 ```
 

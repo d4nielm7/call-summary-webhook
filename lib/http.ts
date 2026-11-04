@@ -1,5 +1,3 @@
-import { createHash, timingSafeEqual } from "node:crypto";
-
 export function json(body: unknown, status = 200, headers?: HeadersInit): Response {
   return Response.json(body, { status, headers });
 }
@@ -37,23 +35,4 @@ export async function readBody(request: Request, maxBytes: number): Promise<Buff
     chunks.push(value);
   }
   return Buffer.concat(chunks);
-}
-
-// null means the request may go ahead. Demo mode with no token set is open, since its data is made up.
-export function dashboardAccessDenied(request: Request, access: { token: string | undefined; open: boolean }): Response | null {
-  if (access.open) return null;
-  if (!access.token) return json({ status: "not_found" }, 404);
-  if (!hasBearerToken(request, access.token)) return json({ status: "unauthorized" }, 401);
-  return null;
-}
-
-// Both sides are hashed first so the comparison is constant-length.
-export function hasBearerToken(request: Request, expected: string): boolean {
-  const given = /^Bearer (.+)$/.exec(request.headers.get("authorization") ?? "")?.[1];
-  if (!given) return false;
-  return timingSafeEqual(sha256(given), sha256(expected));
-}
-
-function sha256(value: string): Buffer {
-  return createHash("sha256").update(value).digest();
 }

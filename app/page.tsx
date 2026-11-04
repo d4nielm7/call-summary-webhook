@@ -1,5 +1,5 @@
-import { Dashboard } from "@/components/dashboard/dashboard";
+import { FlowDemo } from "@/components/flow-demo";
 
 export default function Page() {
-  return <Dashboard />;
+  return <FlowDemo />;
 }

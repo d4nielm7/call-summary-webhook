@@ -1,4 +1,5 @@
 import { handleCallSummary, type WebhookDeps } from "../handlers/call-summary";
+import type { CallSummary } from "../schema";
 import { sign, SIGNATURE_HEADER } from "../signature";
 
 export type Rng = () => number;
@@ -16,6 +17,12 @@ export interface Payload {
 export interface DeliveryResult {
   status: number;
   json: Record<string, unknown>;
+}
+
+export interface Delivery extends DeliveryResult {
+  kind: DeliveryKind;
+  body: string;
+  signature: string;
 }
 
 export type Deliver = (rawBody: string, signature: string) => Promise<DeliveryResult>;
@@ -106,33 +113,42 @@ export function invalidCall(rng: Rng, now: Date): Record<string, unknown> {
   return call;
 }
 
+export function toPayload(call: CallSummary): Payload {
+  return {
+    ...(call.callId ? { call_id: call.callId } : {}),
+    caller_name: call.callerName,
+    phone: call.phone,
+    reason: call.reason,
+    requested_time: call.requestedTime,
+  };
+}
+
 export class Simulator {
   readonly #deliver: Deliver;
   readonly #secret: string;
   readonly #rng: Rng;
-  readonly #recent: Payload[] = [];
+  readonly #latest: () => Payload | undefined;
 
-  constructor(options: { deliver: Deliver; secret: string; seed?: number }) {
+  constructor(options: { deliver: Deliver; secret: string; latest: () => Payload | undefined; seed?: number }) {
     this.#deliver = options.deliver;
     this.#secret = options.secret;
+    this.#latest = options.latest;
     this.#rng = createRng(options.seed ?? Date.now());
   }
 
-  async send(kind: DeliveryKind, now = new Date()): Promise<{ kind: DeliveryKind } & DeliveryResult> {
-    if (kind === "duplicate" && this.#recent.length === 0) kind = "call";
+  // A duplicate repeats the most recent stored call, so with nothing stored it sends a new call instead.
+  async send(kind: DeliveryKind, now = new Date()): Promise<Delivery> {
+    const previous = kind === "duplicate" ? this.#latest() : undefined;
+    if (kind === "duplicate" && !previous) kind = "call";
 
     let body: unknown;
     let secret = this.#secret;
     switch (kind) {
-      case "call": {
-        const call = randomCall(this.#rng, now);
-        this.#recent.push(call);
-        if (this.#recent.length > 20) this.#recent.shift();
-        body = call;
+      case "call":
+        body = randomCall(this.#rng, now);
         break;
-      }
       case "duplicate":
-        body = duplicateOf(this.#rng, pick(this.#rng, this.#recent));
+        body = duplicateOf(this.#rng, previous!);
         break;
       case "invalid":
         body = invalidCall(this.#rng, now);
@@ -144,14 +160,8 @@ export class Simulator {
     }
 
     const raw = JSON.stringify(body);
-    return { kind, ...(await this.#deliver(raw, sign(raw, secret))) };
-  }
-
-  nextKind(): DeliveryKind {
-    const roll = this.#rng();
-    if (roll < 0.7) return "call";
-    if (roll < 0.85) return "duplicate";
-    return roll < 0.96 ? "invalid" : "unsigned";
+    const signature = sign(raw, secret);
+    return { kind, body: raw, signature, ...(await this.#deliver(raw, signature)) };
   }
 }
 

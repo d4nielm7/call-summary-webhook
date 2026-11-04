@@ -99,67 +99,52 @@ describe("CallStore.save", () => {
   });
 });
 
-describe("CallStore queries", () => {
-  it("lists calls newest first and only since the cutoff", () => {
-    const store = new CallStore(":memory:");
-    store.save({ ...call, callId: "a", phone: "+15550100001" }, { at: "2026-11-01T10:00:00.000Z" });
-    store.save({ ...call, callId: "b", phone: "+15550100002" }, { at: "2026-11-03T10:00:00.000Z" });
-    store.save({ ...call, callId: "c", phone: "+15550100003" }, { at: "2026-11-02T10:00:00.000Z" });
+describe("CallStore.latest", () => {
+  const save = (store: CallStore, id: string, at: string) =>
+    store.save({ ...call, callId: id, phone: `+1555010${id.padStart(4, "0")}` }, { at });
 
-    expect(store.callsSince("2026-10-01T00:00:00Z").map((c) => c.callId)).toEqual(["b", "c", "a"]);
-    expect(store.callsSince("2026-11-02T00:00:00Z").map((c) => c.callId)).toEqual(["b", "c"]);
+  it("lists the newest calls first", () => {
+    const store = new CallStore(":memory:");
+    save(store, "1", "2026-11-01T10:00:00.000Z");
+    save(store, "2", "2026-11-03T10:00:00.000Z");
+    save(store, "3", "2026-11-02T10:00:00.000Z");
+    expect(store.latest(10).map((c) => c.callId)).toEqual(["2", "3", "1"]);
   });
 
   it("breaks ties between calls received at the same instant by insertion order", () => {
     const store = new CallStore(":memory:");
     const at = "2026-11-01T10:00:00.000Z";
-    store.save({ ...call, callId: "first", phone: "+15550100001" }, { at });
-    store.save({ ...call, callId: "second", phone: "+15550100002" }, { at });
-    expect(store.callsSince("2026-10-01T00:00:00Z").map((c) => c.callId)).toEqual(["second", "first"]);
+    save(store, "1", at);
+    save(store, "2", at);
+    expect(store.latest(10).map((c) => c.callId)).toEqual(["2", "1"]);
   });
 
   it("respects the limit", () => {
     const store = new CallStore(":memory:");
-    for (let i = 0; i < 5; i++) store.save({ ...call, callId: `c${i}`, phone: `+1555010010${i}` });
-    expect(store.callsSince("2000-01-01T00:00:00Z", 3)).toHaveLength(3);
+    for (let i = 1; i <= 5; i++) save(store, String(i), "2026-11-01T10:00:00.000Z");
+    expect(store.latest(3)).toHaveLength(3);
+  });
+
+  it("is empty for an empty store", () => {
+    expect(new CallStore(":memory:").latest(5)).toEqual([]);
   });
 });
 
-describe("CallStore events", () => {
-  it("records outcomes newest first", () => {
+describe("CallStore.clear", () => {
+  it("removes every call", () => {
     const store = new CallStore(":memory:");
-    store.recordEvent({ outcome: "created" });
-    store.recordEvent({ outcome: "invalid" });
-    expect(store.recentEvents(10).map((e) => e.outcome)).toEqual(["invalid", "created"]);
+    store.save(call);
+    store.save({ ...call, callId: "call_2", phone: "+15550100124" });
+    store.clear();
+    expect(store.count()).toBe(0);
+    expect(store.latest(10)).toEqual([]);
   });
 
-  it("joins an event to its call, and leaves refused ones without a call", () => {
+  it("forgets what it had seen, so the same call is stored again", () => {
     const store = new CallStore(":memory:");
-    const { id } = store.save(call);
-    store.recordEvent({ outcome: "duplicate", callRef: id, matchedOn: "slot" });
-    store.recordEvent({ outcome: "unauthorized" });
-
-    const [refused, duplicate] = store.recentEvents(10);
-    expect(refused?.call).toBeNull();
-    expect(duplicate).toMatchObject({ matchedOn: "slot", call: { callerName: "Jane Sample", reason: "Check-up" } });
-  });
-
-  it("rejects an outcome the table does not know", () => {
-    const store = new CallStore(":memory:");
-    expect(() => store.recordEvent({ outcome: "exploded" as never })).toThrow();
-  });
-
-  it("prunes old events so a flood cannot grow the table forever", () => {
-    const store = new CallStore(":memory:");
-    for (let i = 0; i < 20_050; i++) store.recordEvent({ outcome: "unauthorized" });
-    expect(store.eventsSince("1970-01-01T00:00:00Z")).toHaveLength(20_000);
-  });
-
-  it("filters events by time", () => {
-    const store = new CallStore(":memory:");
-    store.recordEvent({ outcome: "created", at: "2026-11-01T00:00:00.000Z" });
-    store.recordEvent({ outcome: "created", at: "2026-11-03T00:00:00.000Z" });
-    expect(store.eventsSince("2026-11-02T00:00:00Z")).toHaveLength(1);
+    store.save(call);
+    store.clear();
+    expect(store.save(call).created).toBe(true);
   });
 });
 

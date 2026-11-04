@@ -4,20 +4,11 @@ import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import type { CallSummary } from "./schema";
 
-export type Outcome = "created" | "duplicate" | "invalid" | "unauthorized";
 export type MatchedOn = "call_id" | "slot";
 
 export interface StoredCall extends CallSummary {
   id: string;
   receivedAt: string;
-}
-
-export interface DeliveryEvent {
-  id: number;
-  at: string;
-  outcome: Outcome;
-  matchedOn: MatchedOn | null;
-  call: Pick<StoredCall, "callerName" | "reason" | "requestedTime"> | null;
 }
 
 export type SaveResult = { created: true; id: string } | { created: false; id: string; matchedOn: MatchedOn };
@@ -31,18 +22,6 @@ interface CallRow {
   requested_time: string;
   received_at: string;
 }
-
-interface EventRow {
-  id: number;
-  at: string;
-  outcome: Outcome;
-  matched_on: MatchedOn | null;
-  caller_name: string | null;
-  reason: string | null;
-  requested_time: string | null;
-}
-
-const MAX_EVENTS = 20_000;
 
 // Name and reason are left out of the key on purpose: speech-to-text spells the same person
 // differently between calls, and a model rarely words the same request the same way twice.
@@ -71,15 +50,6 @@ export class CallStore {
         received_at    TEXT NOT NULL
       ) STRICT;
       CREATE INDEX IF NOT EXISTS calls_received_at ON calls (received_at);
-
-      CREATE TABLE IF NOT EXISTS events (
-        id         INTEGER PRIMARY KEY AUTOINCREMENT,
-        at         TEXT NOT NULL,
-        outcome    TEXT NOT NULL CHECK (outcome IN ('created', 'duplicate', 'invalid', 'unauthorized')),
-        call_ref   TEXT,
-        matched_on TEXT
-      ) STRICT;
-      CREATE INDEX IF NOT EXISTS events_at ON events (at);
     `);
   }
 
@@ -107,44 +77,11 @@ export class CallStore {
     throw new Error("insert conflicted but no matching row was found");
   }
 
-  recordEvent(event: { outcome: Outcome; callRef?: string | null; matchedOn?: MatchedOn | null; at?: string }): void {
-    this.#db
-      .prepare("INSERT INTO events (at, outcome, call_ref, matched_on) VALUES (?, ?, ?, ?)")
-      .run(event.at ?? new Date().toISOString(), event.outcome, event.callRef ?? null, event.matchedOn ?? null);
-    this.#db.prepare("DELETE FROM events WHERE id <= (SELECT MAX(id) FROM events) - ?").run(MAX_EVENTS);
-  }
-
-  eventsSince(sinceIso: string, limit = 50_000): Array<{ at: string; outcome: Outcome }> {
-    return this.#db
-      .prepare("SELECT at, outcome FROM events WHERE at >= ? ORDER BY at DESC LIMIT ?")
-      .all(sinceIso, limit) as Array<{ at: string; outcome: Outcome }>;
-  }
-
-  callsSince(sinceIso: string, limit = 5000): StoredCall[] {
+  latest(limit: number): StoredCall[] {
     const rows = this.#db
-      .prepare("SELECT * FROM calls WHERE received_at >= ? ORDER BY received_at DESC, rowid DESC LIMIT ?")
-      .all(sinceIso, limit) as unknown as CallRow[];
+      .prepare("SELECT * FROM calls ORDER BY received_at DESC, rowid DESC LIMIT ?")
+      .all(limit) as unknown as CallRow[];
     return rows.map(toStoredCall);
-  }
-
-  recentEvents(limit: number): DeliveryEvent[] {
-    const rows = this.#db
-      .prepare(
-        `SELECT e.id, e.at, e.outcome, e.matched_on, c.caller_name, c.reason, c.requested_time
-         FROM events e LEFT JOIN calls c ON c.id = e.call_ref
-         ORDER BY e.id DESC LIMIT ?`,
-      )
-      .all(limit) as unknown as EventRow[];
-    return rows.map((row) => ({
-      id: row.id,
-      at: row.at,
-      outcome: row.outcome,
-      matchedOn: row.matched_on,
-      call:
-        row.caller_name === null
-          ? null
-          : { callerName: row.caller_name, reason: row.reason ?? "", requestedTime: row.requested_time ?? "" },
-    }));
   }
 
   get(id: string): StoredCall | undefined {
@@ -154,6 +91,10 @@ export class CallStore {
 
   count(): number {
     return (this.#db.prepare("SELECT COUNT(*) AS n FROM calls").get() as { n: number }).n;
+  }
+
+  clear(): void {
+    this.#db.exec("DELETE FROM calls");
   }
 
   close(): void {

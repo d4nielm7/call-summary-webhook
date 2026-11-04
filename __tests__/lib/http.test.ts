@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { dashboardAccessDenied, guarded, hasBearerToken, json, readBody } from "@/lib/http";
+import { guarded, json, readBody } from "@/lib/http";
 
 const post = (body?: BodyInit, headers: Record<string, string> = {}) =>
   new Request("http://localhost/x", { method: "POST", body, headers });
@@ -51,52 +51,6 @@ describe("readBody", () => {
 
   it("counts bytes, not characters", async () => {
     expect(await readBody(post("é".repeat(60)), 100)).toBeNull();
-  });
-});
-
-describe("hasBearerToken", () => {
-  const token = "dashboard-token-0123456789";
-  const withAuth = (value?: string) => new Request("http://localhost/x", { headers: value ? { authorization: value } : {} });
-
-  it("accepts the right token", () => {
-    expect(hasBearerToken(withAuth(`Bearer ${token}`), token)).toBe(true);
-  });
-
-  it.each([undefined, "", "Bearer", "Bearer ", "Bearer nope", "Basic abc", "bearer lower-case-scheme"])("rejects %j", (header) => {
-    expect(hasBearerToken(withAuth(header), token)).toBe(false);
-  });
-
-  it("rejects the token without the scheme", () => {
-    expect(hasBearerToken(withAuth(token), token)).toBe(false);
-  });
-
-  it("rejects a prefix or an extension of the token", () => {
-    expect(hasBearerToken(withAuth(`Bearer ${token.slice(0, -1)}`), token)).toBe(false);
-    expect(hasBearerToken(withAuth(`Bearer ${token}x`), token)).toBe(false);
-  });
-});
-
-describe("dashboardAccessDenied", () => {
-  const token = "dashboard-token-0123456789";
-  const withAuth = (value?: string) => new Request("http://localhost/x", { headers: value ? { authorization: value } : {} });
-
-  it("lets anyone through when the dashboard is open", () => {
-    expect(dashboardAccessDenied(withAuth(), { token: undefined, open: true })).toBeNull();
-    expect(dashboardAccessDenied(withAuth("Bearer nope"), { token, open: true })).toBeNull();
-  });
-
-  it("is a 404 when closed and no token is configured", async () => {
-    const response = dashboardAccessDenied(withAuth(`Bearer ${token}`), { token: undefined, open: false });
-    expect(response?.status).toBe(404);
-  });
-
-  it("is a 401 for a missing or wrong token when closed", () => {
-    expect(dashboardAccessDenied(withAuth(), { token, open: false })?.status).toBe(401);
-    expect(dashboardAccessDenied(withAuth("Bearer nope"), { token, open: false })?.status).toBe(401);
-  });
-
-  it("lets the right token through when closed", () => {
-    expect(dashboardAccessDenied(withAuth(`Bearer ${token}`), { token, open: false })).toBeNull();
   });
 });
 

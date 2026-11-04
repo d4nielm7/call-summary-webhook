@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { createRng, deliverToWebhook, duplicateOf, invalidCall, randomCall, Simulator } from "@/lib/demo/simulator";
+import { createRng, deliverToWebhook, duplicateOf, invalidCall, randomCall, Simulator, toPayload } from "@/lib/demo/simulator";
 import { parseCallSummary } from "@/lib/schema";
+import { sign } from "@/lib/signature";
 import { CallStore } from "@/lib/store";
 import { SECRET } from "../helpers";
 
@@ -106,7 +107,16 @@ describe("invalidCall", () => {
 describe("Simulator", () => {
   const make = (seed = 1) => {
     const store = new CallStore(":memory:");
-    return { store, simulator: new Simulator({ secret: SECRET, seed, deliver: deliverToWebhook({ store, secret: SECRET }) }) };
+    const simulator = new Simulator({
+      secret: SECRET,
+      seed,
+      deliver: deliverToWebhook({ store, secret: SECRET }),
+      latest: () => {
+        const [call] = store.latest(1);
+        return call && toPayload(call);
+      },
+    });
+    return { store, simulator };
   };
 
   it("delivers each kind through the real webhook", async () => {
@@ -118,27 +128,37 @@ describe("Simulator", () => {
     expect(store.count()).toBe(1);
   });
 
+  it("returns the body and signature it sent", async () => {
+    const sent = await make().simulator.send("call", now);
+    expect(sent.signature).toBe(sign(sent.body, SECRET));
+    expect(parseCallSummary(JSON.parse(sent.body)).ok).toBe(true);
+  });
+
+  it("signs a forged call with some other secret", async () => {
+    const sent = await make().simulator.send("unsigned", now);
+    expect(sent.signature).not.toBe(sign(sent.body, SECRET));
+  });
+
   it("sends a new call when there is nothing to duplicate yet", async () => {
     expect(await make().simulator.send("duplicate", now)).toMatchObject({ kind: "call", status: 201 });
   });
 
-  it("only repeats calls it really sent", async () => {
+  it("only ever repeats what is really stored", async () => {
     const { simulator, store } = make();
     for (let i = 0; i < 5; i++) await simulator.send("call", now);
     for (let i = 0; i < 20; i++) expect((await simulator.send("duplicate", now)).status).toBe(200);
     expect(store.count()).toBe(5);
   });
+});
 
-  it("mixes outcomes the way a busy day does", () => {
-    const { simulator } = make(99);
-    const counts: Record<string, number> = {};
-    for (let i = 0; i < 2000; i++) {
-      const kind = simulator.nextKind();
-      counts[kind] = (counts[kind] ?? 0) + 1;
-    }
-    expect(counts.call).toBeGreaterThan(counts.duplicate!);
-    expect(counts.duplicate).toBeGreaterThan(counts.invalid!);
-    expect(counts.invalid).toBeGreaterThan(counts.unsigned!);
-    expect(counts.unsigned).toBeGreaterThan(0);
+describe("toPayload", () => {
+  const call = { callId: "c1", callerName: "Jane", phone: "+15550100123", reason: "x", requestedTime: "2026-11-10T14:00:00.000Z" };
+
+  it("goes back to the wire format", () => {
+    expect(toPayload(call)).toEqual({ call_id: "c1", caller_name: "Jane", phone: "+15550100123", reason: "x", requested_time: "2026-11-10T14:00:00.000Z" });
+  });
+
+  it("leaves out a missing call id", () => {
+    expect("call_id" in toPayload({ ...call, callId: null })).toBe(false);
   });
 });

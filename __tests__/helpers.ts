@@ -3,7 +3,6 @@ import { sign, SIGNATURE_HEADER } from "@/lib/signature";
 import { CallStore } from "@/lib/store";
 
 export const SECRET = "test-secret-0123456789abcdef";
-export const DASHBOARD_TOKEN = "dashboard-token-0123456789";
 
 export const validPayload = {
   call_id: "call_sample_0001",
