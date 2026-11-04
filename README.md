@@ -10,9 +10,13 @@ TypeScript · [Hono](https://hono.dev) · [zod](https://zod.dev) · SQLite (Node
 
 ## Architecture
 
-![System architecture](docs/architecture.png)
+![Architecture overview](docs/architecture-overview.png)
 
-One Node process and one SQLite file. A signed call passes `signature.ts` → `schema.ts` → `store.ts` and lands in the `calls` table, where two `UNIQUE` keys decide what counts as a duplicate. The dashboard is a static page plus one token-protected JSON endpoint reading the same file. The blue path is the brief (receive, validate, de-duplicate, store); the grey paths support the dashboard and the demo.
+A receptionist (or the built-in simulator) sends a signed call summary. The server checks the sender, validates and tidies the data, catches repeats and stores each call once, in one SQLite file. The dashboard asks the server for numbers and never touches the database directly. The blue path is the brief; the grey path is the dashboard.
+
+**In detail, down to the files:**
+
+![System in detail](docs/architecture.png)
 
 [`docs/architecture.html`](docs/architecture.html) is the full write-up (open it in a browser): the request path with every status code, the data model, how the dashboard gets its numbers, the security controls with the test that proves each one, and the trade-offs.
 

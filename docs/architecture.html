@@ -93,6 +93,16 @@ figcaption b { color: var(--ink); font-weight: 600; }
 .pill.bad { fill: color-mix(in oklab, var(--bad) 11%, var(--surface)); stroke: var(--bad); }
 .code { font: 600 12px var(--mono); fill: var(--ink); }
 
+.ttl-l { font: 600 19px var(--sans); fill: var(--ink); }
+.sub-l { font: 400 13px var(--sans); fill: var(--ink-3); }
+.step { font: 500 14.5px var(--sans); fill: var(--ink); }
+.lbl-l { font: 400 12.5px var(--sans); fill: var(--ink-2); }
+.tag-l { font: 500 11.5px var(--mono); letter-spacing: 0.08em; fill: var(--ink-3); }
+.num-c { fill: var(--accent); }
+.num-t { font: 600 12px var(--sans); fill: var(--surface); }
+.chip-n { font: 600 13px var(--mono); fill: var(--ink); }
+.chip-d { font: 400 12px var(--sans); fill: var(--ink-3); }
+
 /* ---- cards, tables ---- */
 .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
 .card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 18px 20px; display: grid; gap: 10px; align-content: start; }
@@ -147,12 +157,87 @@ td code { font-size: 0.82rem; color: var(--ink); }
   </div>
 </header>
 
+<!-- 0 · OVERVIEW -->
+<section id="overview">
+  <div class="head">
+    <span class="eyebrow">Overview</span>
+    <h2>The whole system on one page</h2>
+    <p>A receptionist sends in a call summary. The server checks it and stores it once. Staff watch it arrive on a dashboard.</p>
+  </div>
+  <figure>
+    <div class="fig">
+      <svg viewBox="0 0 1200 490" role="img" aria-label="Overview. The AI receptionist, or the simulator, sends a signed call summary to the server. The server checks the sender, tidies the data, catches repeats and stores each call once in a database. The staff dashboard asks the server for numbers, which the server reads from the same database.">
+        <defs>
+          <marker id="o-m" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto"><path class="h-m" d="M0 0L10 5L0 10z"/></marker>
+          <marker id="o-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto"><path class="h-a" d="M0 0L10 5L0 10z"/></marker>
+        </defs>
+
+        <text class="tag-l" x="20" y="32">OUTSIDE THE SERVER</text>
+        <text class="tag-l" x="400" y="32">THE SERVER · ONE PROCESS</text>
+        <text class="tag-l" x="940" y="32">STORAGE</text>
+
+        <!-- outside -->
+        <rect class="box hot" x="20" y="84" width="240" height="84" rx="14"/>
+        <text class="ttl-l" x="38" y="118">AI receptionist</text>
+        <text class="sub-l" x="38" y="142">Sends a summary when a call ends</text>
+        <rect class="box" x="20" y="196" width="240" height="84" rx="14"/>
+        <text class="ttl-l" x="38" y="230">Simulator</text>
+        <text class="sub-l" x="38" y="254">Fictional calls, for the demo</text>
+        <rect class="box" x="20" y="344" width="240" height="84" rx="14"/>
+        <text class="ttl-l" x="38" y="378">Staff dashboard</text>
+        <text class="sub-l" x="38" y="402">A live view in the browser</text>
+
+        <!-- server -->
+        <rect class="proc" x="400" y="52" width="400" height="420" rx="18"/>
+        <rect class="lane" x="416" y="68" width="368" height="232" rx="12"/>
+        <text class="tag-l" x="432" y="92">RECEIVE A CALL</text>
+        <circle class="num-c" cx="444" cy="128" r="12"/><text class="num-t" x="444" y="132.5" text-anchor="middle">1</text>
+        <text class="step" x="466" y="133">Check it is really the receptionist</text>
+        <circle class="num-c" cx="444" cy="170" r="12"/><text class="num-t" x="444" y="174.5" text-anchor="middle">2</text>
+        <text class="step" x="466" y="175">Check and tidy the data</text>
+        <circle class="num-c" cx="444" cy="212" r="12"/><text class="num-t" x="444" y="216.5" text-anchor="middle">3</text>
+        <text class="step" x="466" y="217">Catch repeats</text>
+        <circle class="num-c" cx="444" cy="254" r="12"/><text class="num-t" x="444" y="258.5" text-anchor="middle">4</text>
+        <text class="step" x="466" y="259">Store it once</text>
+
+        <rect class="lane" x="416" y="316" width="368" height="144" rx="12"/>
+        <text class="tag-l" x="432" y="340">SHOW WHAT HAPPENED</text>
+        <text class="step" x="432" y="376">The dashboard page and its live numbers</text>
+        <text class="sub-l" x="432" y="400">Needs an access key to see any data</text>
+        <text class="sub-l" x="432" y="422">Refreshes every 3 seconds</text>
+
+        <!-- storage -->
+        <rect class="box hot" x="940" y="130" width="240" height="190" rx="14"/>
+        <text class="ttl-l" x="958" y="166">Database</text>
+        <text class="sub-l" x="958" y="188">One SQLite file</text>
+        <rect class="inner" x="956" y="204" width="208" height="46" rx="8"/>
+        <text class="chip-n" x="970" y="224">calls</text><text class="chip-d" x="970" y="241">each real call, once</text>
+        <rect class="inner" x="956" y="258" width="208" height="46" rx="8"/>
+        <text class="chip-n" x="970" y="278">events</text><text class="chip-d" x="970" y="295">every delivery, no caller data</text>
+
+        <!-- flows -->
+        <line class="flow hot" x1="260" y1="128" x2="414" y2="128" marker-end="url(#o-a)"/>
+        <text class="lbl-l" x="326" y="116" text-anchor="middle">signed call summary</text>
+        <line class="flow hot" x1="260" y1="238" x2="414" y2="238" marker-end="url(#o-a)"/>
+        <text class="lbl-l" x="326" y="226" text-anchor="middle">the same kind of call</text>
+        <line class="flow" x1="260" y1="386" x2="414" y2="386" marker-end="url(#o-m)"/>
+        <text class="lbl-l" x="326" y="374" text-anchor="middle">asks for the numbers</text>
+        <line class="flow hot" x1="784" y1="254" x2="938" y2="254" marker-end="url(#o-a)"/>
+        <text class="lbl-l" x="861" y="242" text-anchor="middle">store once</text>
+        <path class="flow" d="M784 386 L1060 386 L1060 322" marker-end="url(#o-m)"/>
+        <text class="lbl-l" x="920" y="374" text-anchor="middle">reads the numbers</text>
+      </svg>
+    </div>
+    <figcaption><b>How to read it.</b> The blue path is what was asked for: a call comes in, is checked in four steps, and is stored once. The grey path is the dashboard, which only ever talks to the server and never touches the database directly. The simulator sends the same kind of call as the real receptionist, so the demo exercises the real checks.</figcaption>
+  </figure>
+</section>
+
 <!-- 1 · SYSTEM ARCHITECTURE -->
 <section id="system">
   <div class="head">
-    <span class="eyebrow">1 · System</span>
-    <h2>Everything runs in one process with one database file</h2>
-    <p>The blue path is what the brief asked for: receive, validate, de-duplicate, store. The grey paths exist so the work can be seen and demonstrated.</p>
+    <span class="eyebrow">1 · System in detail</span>
+    <h2>The same system, down to the files</h2>
+    <p>Everything runs in one process with one database file. The blue path is the brief: receive, validate, de-duplicate, store. The grey paths exist so the work can be seen and demonstrated.</p>
   </div>
   <figure>
     <div class="fig">
