@@ -9,7 +9,7 @@ interface StoredCallsProps {
 }
 
 export function StoredCalls({ total, calls, onClear, timeZone }: StoredCallsProps) {
-  if (calls.length === 0) return <p className="muted">Nothing stored yet.</p>;
+  if (calls.length === 0) return <p className="muted">Nothing stored yet. Press New call to send one.</p>;
 
   return (
     <>

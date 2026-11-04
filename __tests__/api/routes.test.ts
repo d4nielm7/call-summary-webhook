@@ -99,14 +99,32 @@ describe("demo routes", () => {
 
     await webhook.POST(signed(validPayload));
     const body = (await (await calls.GET(demoCalls())).json()) as { total: number; calls: Array<{ caller_name: string }> };
-    expect(body.total).toBe(1);
+    expect(body.total).toBe(5);
     expect(body.calls[0]?.caller_name).toBe("Jane Sample");
   });
 
-  it("start empty, with no made-up history", async () => {
+  it("start with a few sample calls, each with all four fields", async () => {
     configure({ DEMO_MODE: "1", WEBHOOK_SECRET: "" });
     const { GET } = await import("@/app/api/demo/calls/route");
-    expect(await (await GET(demoCalls())).json()).toEqual({ total: 0, calls: [] });
+
+    const body = (await (await GET(demoCalls())).json()) as { total: number; calls: Array<Record<string, string>> };
+    expect(body.total).toBe(4);
+    for (const call of body.calls) {
+      for (const field of ["caller_name", "phone", "reason", "requested_time"]) expect(call[field], field).toBeTruthy();
+    }
+  });
+
+  it("seed the samples once, however often the store is asked for", async () => {
+    configure({ DEMO_MODE: "1", WEBHOOK_SECRET: "" });
+    const { getStore } = await import("@/lib/db");
+    getStore();
+    expect(getStore().count()).toBe(4);
+  });
+
+  it("do not seed a real server", async () => {
+    configure();
+    const { getStore } = await import("@/lib/db");
+    expect(getStore().count()).toBe(0);
   });
 
   it("answer a plain 500, not a crash, when the store is broken", async () => {
